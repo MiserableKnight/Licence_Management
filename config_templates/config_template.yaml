@@ -1,0 +1,33 @@
+data_file: sample_data/人员证件信息.csv
+email:
+  receiver_email: recipient@example.com
+  sender_name: 证件管理系统
+  smtp_password: your_auth_code
+  smtp_port: 587
+  smtp_server: smtp.qq.com
+  smtp_user: your_email@qq.com
+  use_ssl: false
+  use_tls: true
+log_file: logs/licence_management_{date}.log
+log_level: INFO
+mail_template:
+  body_html: "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>证件到期提醒</title>\n\
+    </head>\n<body>\n    <h2>证件到期提醒</h2>\n    <p>以下证件即将到期或已过期，请及时处理：</p>\n    <table\
+    \ border=\"1\" style=\"border-collapse: collapse; width: 100%;\">\n        <tr\
+    \ style=\"background-color: #f2f2f2;\">\n            <th>姓名</th>\n           \
+    \ <th>证件类型</th>\n            <th>到期日期</th>\n            <th>剩余天数</th>\n      \
+    \      <th>备注</th>\n        </tr>\n        {table_rows}\n    </table>\n    <br>\n\
+    \    <p>此邮件由系统自动发送，请勿回复。</p>\n</body>\n</html>"
+  subject: 证件到期提醒 - {count}个证件需要关注 ({today_date})
+  table_row_html: "<tr>\n            <td>{person_name}</td>\n            <td>{document_type}</td>\n\
+    \            <td>{expiry_date}</td>\n            <td style=\"color: {color};\"\
+    >{days_left}</td>\n            <td>{remarks}</td>\n        </tr>"
+reminder:
+  days_before_expiry:
+  - 60
+  - 30
+  - 7
+  - 1
+report:
+  days_until_expiring_threshold: 30
+  output_filename: 证件状态报告_{date}.csv

@@ -1,0 +1,25 @@
+# 人员证件有效期管控系统 - 项目依赖
+
+# 核心数据处理库
+pandas>=2.0.0
+
+# YAML配置文件解析
+PyYAML>=6.0
+
+# 日期时间处理增强
+python-dateutil>=2.8.0
+
+# 定时任务调度 (使用Windows任务计划程序，无需额外依赖)
+# schedule>=1.2.0
+
+# 邮件发送相关（Python内置，无需额外安装）
+# smtplib - Python内置
+# email - Python内置
+
+# 日志记录（Python内置，无需额外安装）
+# logging - Python内置
+
+# 其他可选依赖（用于开发和测试）
+# pytest>=7.0.0  # 单元测试框架
+# black>=22.0.0   # 代码格式化工具
+# flake8>=5.0.0   # 代码检查工具 

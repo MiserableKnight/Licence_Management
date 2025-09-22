@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>证件到期提醒</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #007bff;
+        }
+        .header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 28px;
+        }
+        .header p {
+            color: #666;
+            margin: 10px 0 0 0;
+            font-size: 16px;
+        }
+        .summary {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        .summary h3 {
+            margin: 0 0 10px 0;
+            color: #007bff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        .status-expired {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+        .status-warning {
+            color: #fd7e14 !important;
+            font-weight: bold;
+        }
+        .status-caution {
+            color: #ffc107 !important;
+            font-weight: bold;
+        }
+        .status-normal {
+            color: #28a745 !important;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .urgent {
+            background-color: #fff5f5 !important;
+        }
+        .warning {
+            background-color: #fffdf0 !important;
+        }
+        .icon {
+            font-size: 16px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="icon">📋</span>证件到期提醒</h1>
+            <p>人员证件有效期管控系统</p>
+        </div>
+        
+        <div class="summary">
+            <h3><span class="icon">📊</span>提醒汇总</h3>
+            <p>以下证件即将到期或已过期，请及时处理：</p>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th><span class="icon">👤</span>姓名</th>
+                    <th><span class="icon">📄</span>证件类型</th>
+                    <th><span class="icon">📅</span>到期日期</th>
+                    <th><span class="icon">⏰</span>剩余天数</th>
+                    <th><span class="icon">💼</span>备注</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p><span class="icon">🤖</span>此邮件由人员证件有效期管控系统自动发送</p>
+            <p><span class="icon">📧</span>请勿直接回复此邮件</p>
+            <p><span class="icon">🕒</span>发送时间：{send_time}</p>
+        </div>
+    </div>
+</body>
+</html> 
