@@ -52,4 +52,8 @@ Thumbs.db
 
 # 临时文件
 *.tmp
-*.temp 
+*.temp
+
+# 示例数据文件夹（可能包含敏感的真实数据）
+sample_data/
+data/ 
