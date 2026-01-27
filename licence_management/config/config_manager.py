@@ -11,16 +11,25 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class EmailConfig:
-    """邮件配置类"""
+class SmtpServerConfig:
+    """单个SMTP服务器配置类"""
+    name: str
     smtp_server: str
     smtp_port: int
     smtp_user: str
     smtp_password: str
     sender_name: str
-    receiver_email: str
     use_ssl: bool = True
     use_tls: bool = False
+
+
+@dataclass
+class EmailConfig:
+    """邮件配置类"""
+    primary_server: SmtpServerConfig
+    backup_servers: List[SmtpServerConfig]
+    receiver_email: str
+    max_retry_attempts: int = 3
 
 
 @dataclass
@@ -147,23 +156,121 @@ class ConfigManager:
         return app_config
     
     def _build_email_config(self, email_data: Dict[str, Any]) -> EmailConfig:
-        """构建邮件配置"""
-        required_fields = ['smtp_server', 'smtp_port', 'smtp_user', 'smtp_password', 
+        """
+        构建邮件配置
+
+        支持新格式（primary_server + backup_servers）和旧格式（直接配置）
+        自动将旧格式转换为新格式
+        """
+        # 检测配置格式
+        if 'primary_server' in email_data:
+            # 新格式：primary_server + backup_servers
+            return self._build_email_config_new(email_data)
+        else:
+            # 旧格式：直接配置，自动转换为新格式
+            return self._build_email_config_legacy(email_data)
+
+    def _build_email_config_new(self, email_data: Dict[str, Any]) -> EmailConfig:
+        """构建新格式的邮件配置"""
+        # 验证必需字段
+        if 'primary_server' not in email_data:
+            raise ValueError("邮件配置缺少 primary_server 字段")
+
+        if 'receiver_email' not in email_data:
+            raise ValueError("邮件配置缺少 receiver_email 字段")
+
+        # 构建主服务器配置
+        primary_data = email_data['primary_server']
+        primary_server = self._build_smtp_server_config(primary_data, "主服务器")
+
+        # 构建备用服务器配置（如果有）
+        backup_servers = []
+        if 'backup_servers' in email_data and email_data['backup_servers']:
+            for i, backup_data in enumerate(email_data['backup_servers']):
+                server = self._build_smtp_server_config(
+                    backup_data,
+                    f"备用服务器{i+1}"
+                )
+                backup_servers.append(server)
+
+        return EmailConfig(
+            primary_server=primary_server,
+            backup_servers=backup_servers,
+            receiver_email=email_data['receiver_email'],
+            max_retry_attempts=email_data.get('max_retry_attempts', 3)
+        )
+
+    def _build_email_config_legacy(self, email_data: Dict[str, Any]) -> EmailConfig:
+        """
+        构建旧格式的邮件配置（向后兼容）
+
+        将旧格式自动转换为新格式，并打印警告
+        """
+        import warnings
+
+        # 验证旧格式的必需字段
+        required_fields = ['smtp_server', 'smtp_port', 'smtp_user', 'smtp_password',
                           'sender_name', 'receiver_email']
-        
+
         for field in required_fields:
             if field not in email_data:
                 raise ValueError(f"邮件配置缺少字段: {field}")
-        
-        return EmailConfig(
+
+        # 打印警告信息
+        warnings.warn(
+            "邮件配置使用了旧格式，已自动转换为新格式。"
+            "建议将配置文件更新为：primary_server + backup_servers 格式。"
+            "参考：https://github.com/your-repo/docs/config-upgrade.md",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
+        # 将旧格式转换为主服务器配置
+        primary_server = SmtpServerConfig(
+            name="默认服务器（旧格式转换）",
             smtp_server=email_data['smtp_server'],
             smtp_port=email_data['smtp_port'],
             smtp_user=email_data['smtp_user'],
             smtp_password=email_data['smtp_password'],
             sender_name=email_data['sender_name'],
-            receiver_email=email_data['receiver_email'],
             use_ssl=email_data.get('use_ssl', True),
             use_tls=email_data.get('use_tls', False)
+        )
+
+        return EmailConfig(
+            primary_server=primary_server,
+            backup_servers=[],
+            receiver_email=email_data['receiver_email'],
+            max_retry_attempts=email_data.get('max_retry_attempts', 3)
+        )
+
+    def _build_smtp_server_config(self, server_data: Dict[str, Any], server_name_hint: str) -> SmtpServerConfig:
+        """
+        构建单个SMTP服务器配置
+
+        Args:
+            server_data: 服务器配置数据
+            server_name_hint: 服务器名称提示（用于错误信息）
+
+        Returns:
+            SMTP服务器配置对象
+        """
+        # 验证必需字段
+        required_fields = ['smtp_server', 'smtp_port', 'smtp_user', 'smtp_password', 'sender_name']
+
+        for field in required_fields:
+            if field not in server_data:
+                raise ValueError(f"{server_name_hint}配置缺少字段: {field}")
+
+        return SmtpServerConfig(
+            name=server_data.get('name', server_name_hint),
+            smtp_server=server_data['smtp_server'],
+            smtp_port=server_data['smtp_port'],
+            smtp_user=server_data['smtp_user'],
+            smtp_password=server_data['smtp_password'],
+            sender_name=server_data['sender_name'],
+            use_ssl=server_data.get('use_ssl', True),
+            use_tls=server_data.get('use_tls', False)
         )
     
     def _build_reminder_config(self, reminder_data: Dict[str, Any]) -> ReminderConfig:
@@ -219,18 +326,34 @@ class ConfigManager:
         
         # 验证邮件配置
         email_config = self._config.email
-        if not email_config.smtp_server:
-            errors.append("SMTP服务器地址不能为空")
-        
-        if not (1 <= email_config.smtp_port <= 65535):
-            errors.append("SMTP端口必须在1-65535之间")
-        
-        if not email_config.smtp_user:
-            errors.append("SMTP用户名不能为空")
-        
-        if not email_config.smtp_password:
-            errors.append("SMTP密码不能为空")
-        
+
+        # 验证主服务器配置
+        if not email_config.primary_server.smtp_server:
+            errors.append("主SMTP服务器地址不能为空")
+
+        if not (1 <= email_config.primary_server.smtp_port <= 65535):
+            errors.append("主SMTP端口必须在1-65535之间")
+
+        if not email_config.primary_server.smtp_user:
+            errors.append("主SMTP用户名不能为空")
+
+        if not email_config.primary_server.smtp_password:
+            errors.append("主SMTP密码不能为空")
+
+        # 验证备用服务器配置
+        for i, backup_server in enumerate(email_config.backup_servers):
+            if not backup_server.smtp_server:
+                errors.append(f"备用服务器{i+1}的SMTP地址不能为空")
+
+            if not (1 <= backup_server.smtp_port <= 65535):
+                errors.append(f"备用服务器{i+1}的SMTP端口必须在1-65535之间")
+
+            if not backup_server.smtp_user:
+                errors.append(f"备用服务器{i+1}的SMTP用户名不能为空")
+
+            if not backup_server.smtp_password:
+                errors.append(f"备用服务器{i+1}的SMTP密码不能为空")
+
         if not email_config.receiver_email:
             errors.append("收件人邮箱不能为空")
         
@@ -252,20 +375,36 @@ class ConfigManager:
     def save_default_config(self, output_file: str = "config_template.yaml") -> None:
         """
         生成默认配置文件模板
-        
+
         Args:
             output_file: 输出文件路径
         """
         default_config = {
             'email': {
-                'smtp_server': 'smtp.qq.com',
-                'smtp_port': 587,
-                'smtp_user': 'your_email@qq.com',
-                'smtp_password': 'your_auth_code',
-                'sender_name': '证件管理系统',
+                'primary_server': {
+                    'name': 'Gmail',
+                    'smtp_server': 'smtp.gmail.com',
+                    'smtp_port': 587,
+                    'smtp_user': 'your_email@gmail.com',
+                    'smtp_password': 'your_app_password',
+                    'sender_name': '证件管理系统',
+                    'use_ssl': False,
+                    'use_tls': True
+                },
+                'backup_servers': [
+                    {
+                        'name': 'QQ邮箱',
+                        'smtp_server': 'smtp.qq.com',
+                        'smtp_port': 587,
+                        'smtp_user': 'your_email@qq.com',
+                        'smtp_password': 'your_qq_auth_code',
+                        'sender_name': '证件管理系统',
+                        'use_ssl': False,
+                        'use_tls': True
+                    }
+                ],
                 'receiver_email': 'recipient@example.com',
-                'use_ssl': False,
-                'use_tls': True
+                'max_retry_attempts': 3
             },
             'reminder': {
                 'days_before_expiry': [60, 30, 7, 1]
