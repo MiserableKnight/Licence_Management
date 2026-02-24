@@ -11,7 +11,7 @@ from dateutil.parser import parse as dateutil_parse
 
 class DateUtils:
     """日期处理工具类"""
-    
+
     # 支持的日期格式列表
     SUPPORTED_FORMATS = [
         '%Y%m%d',        # 20240101
@@ -21,37 +21,83 @@ class DateUtils:
         '%d-%m-%Y',      # 01-01-2024
         '%Y年%m月%d日',   # 2024年01月01日
     ]
+
+    # 无效日期的默认值（用于表示长期有效）
+    INVALID_DATE_DEFAULT = date(2099, 12, 31)
+
+    # 合理的日期范围
+    MIN_REASONABLE_DATE = date(1900, 1, 1)
+    MAX_REASONABLE_DATE = date(2100, 12, 31)
     
     @staticmethod
     def parse_date(date_str: str) -> Optional[date]:
         """
         解析日期字符串为date对象
-        
+
         Args:
             date_str: 日期字符串
-            
+
         Returns:
             解析成功返回date对象，失败返回None
         """
         if not date_str or not isinstance(date_str, str):
             return None
-            
+
         date_str = date_str.strip()
         if not date_str:
             return None
-        
+
+        # 快速检查明显无效的日期格式（如 99/99/9999）
+        if DateUtils._is_obviously_invalid(date_str):
+            return None
+
         # 首先尝试预定义格式
         for fmt in DateUtils.SUPPORTED_FORMATS:
             try:
-                return datetime.strptime(date_str, fmt).date()
+                parsed = datetime.strptime(date_str, fmt).date()
+                # 验证日期是否在合理范围内
+                if DateUtils._is_reasonable_date(parsed):
+                    return parsed
             except ValueError:
                 continue
-        
+
         # 使用dateutil进行智能解析
         try:
-            return dateutil_parse(date_str).date()
+            parsed = dateutil_parse(date_str).date()
+            if DateUtils._is_reasonable_date(parsed):
+                return parsed
         except (ValueError, TypeError):
-            return None
+            pass
+
+        return None
+
+    @staticmethod
+    def _is_obviously_invalid(date_str: str) -> bool:
+        """
+        快速检查明显无效的日期格式
+
+        Args:
+            date_str: 日期字符串
+
+        Returns:
+            是否为明显无效的日期
+        """
+        # 检查是否包含 99/99 或类似模式
+        obvious_patterns = ['99/99', '99-99', '99.99', '9999']
+        return any(pattern in date_str for pattern in obvious_patterns)
+
+    @staticmethod
+    def _is_reasonable_date(date_obj: date) -> bool:
+        """
+        验证日期是否在合理范围内
+
+        Args:
+            date_obj: 日期对象
+
+        Returns:
+            日期是否合理
+        """
+        return DateUtils.MIN_REASONABLE_DATE <= date_obj <= DateUtils.MAX_REASONABLE_DATE
     
     @staticmethod
     def format_date(date_obj: Union[date, datetime], format_str: str = '%Y-%m-%d') -> str:

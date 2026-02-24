@@ -100,65 +100,80 @@ class CSVProcessor:
     def _validate_dataframe(self, df: pd.DataFrame, file_path: str) -> None:
         """
         验证DataFrame的格式和内容
-        
+
         Args:
             df: 要验证的DataFrame
             file_path: 文件路径（用于错误提示）
-            
+
         Raises:
             ValueError: 数据格式错误
         """
         # 检查是否为空
         if df.empty:
             raise ValueError(f"CSV文件为空: {file_path}")
-        
+
         # 检查必需列是否存在
         missing_columns = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
         if missing_columns:
             raise ValueError(f"CSV文件缺少必需列: {missing_columns}, 文件: {file_path}")
-        
+
         # 检查数据完整性
+        invalid_dates_count = 0
         for idx, row in df.iterrows():
             # 检查必需字段是否为空
             for col in self.REQUIRED_COLUMNS:
                 if pd.isna(row[col]) or str(row[col]).strip() == '':
                     raise ValueError(f"第{idx+2}行的'{col}'字段不能为空")
-            
+
             # 验证日期格式
             if 'expiry_date' in row and not pd.isna(row['expiry_date']):
-                if not DateUtils.is_valid_date(str(row['expiry_date'])):
-                    raise ValueError(f"第{idx+2}行的到期日期格式无效: {row['expiry_date']}")
-            
+                expiry_str = str(row['expiry_date']).strip()
+                if not DateUtils.is_valid_date(expiry_str):
+                    # 记录警告但不中断处理
+                    self.logger.warning(f"第{idx+2}行的到期日期格式无效: {expiry_str}，该记录将被跳过")
+                    invalid_dates_count += 1
+
             if 'start_date' in row and not pd.isna(row['start_date']):
-                if not DateUtils.is_valid_date(str(row['start_date'])):
-                    raise ValueError(f"第{idx+2}行的开始日期格式无效: {row['start_date']}")
-        
+                start_str = str(row['start_date']).strip()
+                if start_str and not DateUtils.is_valid_date(start_str):
+                    self.logger.warning(f"第{idx+2}行的开始日期格式无效: {start_str}")
+
+        if invalid_dates_count > 0:
+            self.logger.warning(f"发现 {invalid_dates_count} 条记录的日期格式无效，请检查数据文件")
+
         self.logger.info(f"CSV数据验证通过，共 {len(df)} 行数据")
     
     def _dataframe_to_documents(self, df: pd.DataFrame) -> List[PersonDocument]:
         """
         将DataFrame转换为PersonDocument对象列表
-        
+
         Args:
             df: 要转换的DataFrame
-            
+
         Returns:
             PersonDocument对象列表
         """
         documents = []
-        
+
         for idx, row in df.iterrows():
             try:
                 # 解析日期
                 start_date = None
                 expiry_date = None
-                
+
                 if 'start_date' in row and not pd.isna(row['start_date']):
-                    start_date = DateUtils.parse_date(str(row['start_date']))
-                
+                    start_str = str(row['start_date']).strip()
+                    if start_str:  # 非空字符串才解析
+                        start_date = DateUtils.parse_date(start_str)
+
                 if 'expiry_date' in row and not pd.isna(row['expiry_date']):
-                    expiry_date = DateUtils.parse_date(str(row['expiry_date']))
-                
+                    expiry_str = str(row['expiry_date']).strip()
+                    expiry_date = DateUtils.parse_date(expiry_str)
+                    # 如果到期日期无效，跳过该记录
+                    if expiry_date is None:
+                        self.logger.warning(f"第{idx+2}行：无法解析到期日期，跳过该记录")
+                        continue
+
                 # 创建PersonDocument对象
                 doc = PersonDocument(
                     person_name=str(row['person_name']).strip(),
@@ -167,13 +182,13 @@ class CSVProcessor:
                     expiry_date=expiry_date,
                     remarks=str(row.get('remarks', '')).strip() if not pd.isna(row.get('remarks', '')) else ""
                 )
-                
+
                 documents.append(doc)
-                
+
             except Exception as e:
                 self.logger.error(f"处理第{idx+2}行数据时出错: {e}")
                 raise ValueError(f"处理第{idx+2}行数据时出错: {e}")
-        
+
         return documents
     
     def write_csv_file(self, documents: List[PersonDocument], file_path: str, 
